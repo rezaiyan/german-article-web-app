@@ -1,0 +1,5 @@
+{
+  "name": "German Article Learner",
+  "description": "An interactive web application designed to help users learn German noun articles (der, die, das) using AI-generated flashcards. Each card displays a German word, its corresponding article, and a memorable image to aid in learning.",
+  "requestFramePermissions": []
+}
