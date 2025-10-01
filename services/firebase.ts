@@ -7,13 +7,13 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 // You can find this in the Firebase Console:
 // Project settings > General > Your apps > Web app > Firebase SDK snippet > Config
 const firebaseConfig = {
-  apiKey: "AIzaSyBgnLBRRkfEJhhb4-NsFuwOUykoWxM3vdQ",
-  authDomain: "lga-app-189c9.firebaseapp.com",
-  projectId: "lga-app-189c9",
-  storageBucket: "lga-app-189c9.firebasestorage.app",
-  messagingSenderId: "69524750862",
-  appId: "1:69524750862:web:157ab571631b5174f5325f",
-  measurementId: "G-1FF5WVLL99"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 
@@ -22,17 +22,20 @@ const firebaseConfig = {
  * @returns {boolean} True if the config is not using placeholder values.
  */
 export const isFirebaseConfigured = (): boolean => {
-    // A more robust check to ensure none of the placeholder values are present
-    const placeholderValues = [
-        "YOUR_API_KEY",
-        "YOUR_AUTH_DOMAIN",
-        "YOUR_PROJECT_ID",
-        "YOUR_STORAGE_BUCKET",
-        "YOUR_MESSAGING_SENDER_ID",
-        "YOUR_APP_ID",
-        "YOUR_MEASUREMENT_ID"
+    // Check if all required environment variables are present and not empty
+    const requiredEnvVars = [
+        'VITE_FIREBASE_API_KEY',
+        'VITE_FIREBASE_AUTH_DOMAIN',
+        'VITE_FIREBASE_PROJECT_ID',
+        'VITE_FIREBASE_STORAGE_BUCKET',
+        'VITE_FIREBASE_MESSAGING_SENDER_ID',
+        'VITE_FIREBASE_APP_ID'
     ];
-    return !Object.values(firebaseConfig).some(value => placeholderValues.includes(value) || value === "");
+    
+    return requiredEnvVars.every(envVar => {
+        const value = import.meta.env[envVar];
+        return value !== undefined && value !== "" && value !== null;
+    });
 };
 
 

@@ -4,6 +4,7 @@ import type { AppView, User } from './types';
 import { authService } from './services/authService';
 import { initializeFirebase, isFirebaseConfigured } from './services/firebase';
 import { isGeminiConfigured } from './services/geminiService';
+import { wordService } from './services/wordService';
 import { LoginScreen } from './screens/LoginScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
 import { ProgressScreen } from './screens/ProgressScreen';
@@ -54,25 +55,36 @@ function App() {
   
   useEffect(() => {
     // One-time initialization logic
-    if (!isFirebaseConfigured()) {
-      setConfigErrorDetails({ type: 'firebase', message: "The Firebase configuration is incomplete. Please fill in the placeholder values." });
-      setAppStatus('config-error');
-      return;
-    }
-    if (!isGeminiConfigured()) {
-      setConfigErrorDetails({ type: 'gemini' });
-      setAppStatus('config-error');
-      return;
-    }
+    const initializeApp = async () => {
+      try {
+        // Initialize local database first
+        await wordService.initialize();
+        console.log('Local database initialized successfully');
+        
+        // Check Firebase configuration (optional for local database)
+        if (!isFirebaseConfigured()) {
+          console.warn('Firebase not configured - using local database only');
+        } else {
+          initializeFirebase(); // Attempt to initialize Firebase services
+        }
+        
+        // Check Gemini configuration (optional for local database)
+        if (!isGeminiConfigured()) {
+          console.warn('Gemini not configured - some features may be limited');
+        }
+        
+        setAppStatus('ready');
+      } catch (error) {
+        console.error("App initialization failed:", error);
+        setConfigErrorDetails({ 
+          type: 'firebase', 
+          message: error instanceof Error ? error.message : "Failed to initialize local database." 
+        });
+        setAppStatus('config-error');
+      }
+    };
 
-    try {
-      initializeFirebase(); // Attempt to initialize Firebase services
-      setAppStatus('ready');
-    } catch (error) {
-      console.error("Firebase initialization failed:", error);
-      setConfigErrorDetails({ type: 'firebase', message: error instanceof Error ? error.message : "An unknown initialization error occurred." });
-      setAppStatus('config-error');
-    }
+    initializeApp();
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { localDatabase } from './localDatabase';
 import type { ProgressData } from '../types';
 
 const getTodaysDateString = (): string => {
@@ -15,70 +14,70 @@ const isYesterday = (dateString: string): boolean => {
 
 export const progressService = {
     /**
-     * Fetches the progress data for the currently logged-in user from Firestore.
+     * Fetches the progress data from local database.
      * If no data exists (i.e., for a new user), it returns a default structure.
      */
     getProgressData: async (): Promise<ProgressData | null> => {
-        const user = auth?.currentUser;
-        if (!user || !db) return null;
-
-        const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            return docSnap.data() as ProgressData;
-        } else {
-            // Return default data for a new user, which will be saved on first practice.
-            return {
-                wordsLearned: 0,
-                articlesMastered: 0,
-                streak: 0,
-                lastPracticed: null,
-                streakDates: [],
-            };
+        try {
+            const progressData = await localDatabase.getProgress();
+            return progressData;
+        } catch (error) {
+            console.error('Failed to get progress data:', error);
+            return null;
         }
     },
 
     /**
-     * Records that the user has learned a new word and updates their streak in Firestore.
+     * Records that the user has learned a new word and updates their streak in local database.
      * @param totalWordsLearned - The new total count of words learned after the current session.
      */
     recordWordLearned: async (totalWordsLearned: number): Promise<void> => {
-        const user = auth?.currentUser;
-        if (!user || !db) return;
-
-        const docRef = doc(db, 'users', user.uid);
-        const currentProgress = await progressService.getProgressData();
-        if (!currentProgress) return;
-
-        const today = getTodaysDateString();
-        let newStreak = currentProgress.streak;
-
-        // Only update streak if they haven't practiced today
-        if (currentProgress.lastPracticed !== today) {
-             if (currentProgress.lastPracticed && isYesterday(currentProgress.lastPracticed)) {
-                newStreak += 1; // Continue the streak
-            } else {
-                newStreak = 1; // Start a new streak
+        try {
+            const currentProgress = await progressService.getProgressData();
+            if (!currentProgress) {
+                throw new Error('No progress data found');
             }
 
-            // Atomically add the new date to the streakDates array
-            await updateDoc(docRef, {
-                streakDates: arrayUnion(today)
-            }).catch(async (e) => {
-                 // If document doesn't exist, set it first.
-                 await setDoc(docRef, { streakDates: [today] }, { merge: true });
-            });
-        }
-        
-        const updatedData: Partial<ProgressData> = {
-            wordsLearned: totalWordsLearned,
-            articlesMastered: Math.floor(totalWordsLearned / 3), // Example logic: master 1 article per 3 words
-            streak: newStreak,
-            lastPracticed: today,
-        };
+            const today = getTodaysDateString();
+            let newStreak = currentProgress.streak;
 
-        // Use setDoc with merge to create or update the document
-        await setDoc(docRef, updatedData, { merge: true });
+            // Only update streak if they haven't practiced today
+            if (currentProgress.lastPracticed !== today) {
+                if (currentProgress.lastPracticed && isYesterday(currentProgress.lastPracticed)) {
+                    newStreak += 1; // Continue the streak
+                } else {
+                    newStreak = 1; // Start a new streak
+                }
+
+                // Add the new date to the streakDates array
+                const updatedStreakDates = [...currentProgress.streakDates];
+                if (!updatedStreakDates.includes(today)) {
+                    updatedStreakDates.push(today);
+                }
+
+                const updatedData: ProgressData = {
+                    ...currentProgress,
+                    wordsLearned: totalWordsLearned,
+                    articlesMastered: Math.floor(totalWordsLearned / 3), // Example logic: master 1 article per 3 words
+                    streak: newStreak,
+                    lastPracticed: today,
+                    streakDates: updatedStreakDates,
+                };
+
+                await localDatabase.saveProgress(updatedData);
+            } else {
+                // Just update the word count if they already practiced today
+                const updatedData: ProgressData = {
+                    ...currentProgress,
+                    wordsLearned: totalWordsLearned,
+                    articlesMastered: Math.floor(totalWordsLearned / 3),
+                };
+
+                await localDatabase.saveProgress(updatedData);
+            }
+        } catch (error) {
+            console.error('Failed to record word learned:', error);
+            throw error;
+        }
     }
 };
